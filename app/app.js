@@ -10,16 +10,28 @@ firebase.initializeApp(config);
 
 function saveMessage(text) {
     firebase.database().ref('posts').push({
-    	name: email,
     	message: text,
     	time: (new Date()).toString()
     });
 }
 
-function loadMessage() {
+function loadInitialMessages(viewUpdateFunction) {
 	firebase.database().ref('posts').on('value', function(snapshot) {
-		console.log(snapshot.val());
+        var data = snapshot.val();
+        for(var i in data) {
+            viewUpdateFunction(data[i].message);
+        }
+
+        //turn off listening to this message
+        firebase.database().ref('posts').off('value');
 	});
+}
+
+function listenToMessageUpdate(vieWUpdateFunction) {
+    firebase.database().ref('posts').on('child_added', function(snapshot) {
+        var childData = snapshot.val();
+        vieWUpdateFunction(childData.message);
+    });
 }
 
 function signIn() {
@@ -32,6 +44,7 @@ function signIn() {
 }
 
 //Uncomment below to enable sign in of users
+//but ensure you are serving this page from a server and not a static file
 // firebase.auth().onAuthStateChanged(function(user) {
 // 	if(user) {
 // 		console.log(user.email);
@@ -42,7 +55,7 @@ function signIn() {
 
 (function () {
     var Message;
-    loadMessage();
+    
     Message = function (arg) {
         this.text = arg.text, this.message_side = 'left';
         this.draw = function (_this) {
@@ -77,18 +90,23 @@ function signIn() {
             message = new Message({
                 text: text,
             });
-            saveMessage(text);
             message.draw();
             return $messages.animate({ scrollTop: $messages.prop('scrollHeight') }, 150);
         };
+
         $('.send_message').click(function (e) {
+            saveMessage(getMessageText());
             return showMessage(getMessageText());
         });
         $('.message_input').keyup(function (e) {
             if (e.which === 13) {
+                saveMessage(getMessageText());
                 return showMessage(getMessageText());
             }
         });
+
+        loadInitialMessages(showMessage);
+        listenToMessageUpdate(showMessage);
         
     });
 }.call(this));
